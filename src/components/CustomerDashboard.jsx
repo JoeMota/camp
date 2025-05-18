@@ -17,22 +17,34 @@ import {
   MenuItem,
   IconButton,
   AppBar,
-  Toolbar
+  Toolbar,
+  Chip,
+  Stack
 } from '@mui/material';
-import { Add as AddIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { Add as AddIcon, Menu as MenuIcon, AttachFile as AttachFileIcon } from '@mui/icons-material';
 import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
 
 const CAMP_LOGO_COLOR = '#2563eb';
 
-const jobTypes = [
-  'Residential',
-  'Commercial',
-  'Industrial',
-  'Emergency',
-  'Maintenance'
+const projectTypes = [
+  'EV Charger Installation',
+  'Solar Panel Installation',
+  'Battery Storage System',
+  'General Electrical Work',
+  'Panel Upgrade',
+  'Emergency Service'
 ];
+
+const jobStatuses = {
+  OPEN: 'open',
+  NEGOTIATING: 'negotiating',
+  AWARDED: 'awarded',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed'
+};
 
 export default function CustomerDashboard() {
   const [openJobForm, setOpenJobForm] = useState(false);
@@ -41,10 +53,17 @@ export default function CustomerDashboard() {
     title: '',
     description: '',
     type: '',
-    location: '',
-    date: '',
-    files: null
+    location: {
+      zip: '',
+      city: '',
+      state: ''
+    },
+    startDate: '',
+    endDate: '',
+    files: [],
+    status: jobStatuses.OPEN
   });
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,17 +86,35 @@ export default function CustomerDashboard() {
     setJobs(jobsList);
   };
 
+  const handleFileUpload = async (files) => {
+    const uploadedUrls = [];
+    for (const file of files) {
+      const storageRef = ref(storage, `job-files/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      uploadedUrls.push({
+        name: file.name,
+        url: url
+      });
+    }
+    return uploadedUrls;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!auth.currentUser) return;
 
     try {
+      // Upload files first
+      const fileUrls = await handleFileUpload(uploadedFiles);
+
       const jobData = {
         ...newJob,
         customerId: auth.currentUser.uid,
-        status: 'open',
+        status: jobStatuses.OPEN,
         createdAt: serverTimestamp(),
-        customerName: auth.currentUser.displayName || 'Anonymous'
+        customerName: auth.currentUser.displayName || 'Anonymous',
+        files: fileUrls
       };
 
       await addDoc(collection(db, 'jobs'), jobData);
@@ -86,14 +123,32 @@ export default function CustomerDashboard() {
         title: '',
         description: '',
         type: '',
-        location: '',
-        date: '',
-        files: null
+        location: {
+          zip: '',
+          city: '',
+          state: ''
+        },
+        startDate: '',
+        endDate: '',
+        files: [],
+        status: jobStatuses.OPEN
       });
+      setUploadedFiles([]);
       fetchJobs();
     } catch (error) {
       console.error('Error posting job:', error);
     }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      [jobStatuses.OPEN]: 'primary',
+      [jobStatuses.NEGOTIATING]: 'info',
+      [jobStatuses.AWARDED]: 'success',
+      [jobStatuses.IN_PROGRESS]: 'warning',
+      [jobStatuses.COMPLETED]: 'success'
+    };
+    return colors[status] || 'default';
   };
 
   return (
@@ -127,12 +182,34 @@ export default function CustomerDashboard() {
             <Grid item xs={12} md={6} key={job.id}>
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>{job.title}</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Typography variant="h6">{job.title}</Typography>
+                    <Chip 
+                      label={job.status.replace('_', ' ')} 
+                      color={getStatusColor(job.status)}
+                      size="small"
+                    />
+                  </Box>
                   <Typography color="text.secondary" gutterBottom>{job.type}</Typography>
-                  <Typography variant="body2">{job.description}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Location: {job.location}
-                  </Typography>
+                  <Typography variant="body2" paragraph>{job.description}</Typography>
+                  <Stack direction="row" spacing={1} mb={1}>
+                    <Typography variant="caption" color="text.secondary">
+                      Location: {job.location.city}, {job.location.state} {job.location.zip}
+                    </Typography>
+                  </Stack>
+                  {job.files && job.files.length > 0 && (
+                    <Stack direction="row" spacing={1}>
+                      {job.files.map((file, index) => (
+                        <Chip
+                          key={index}
+                          icon={<AttachFileIcon />}
+                          label={file.name}
+                          size="small"
+                          onClick={() => window.open(file.url, '_blank')}
+                        />
+                      ))}
+                    </Stack>
+                  )}
                 </CardContent>
                 <CardActions>
                   <Button size="small" color="primary">View Details</Button>
@@ -167,49 +244,110 @@ export default function CustomerDashboard() {
               <TextField
                 fullWidth
                 select
-                label="Job Type"
+                label="Project Type"
                 value={newJob.type}
                 onChange={(e) => setNewJob({ ...newJob, type: e.target.value })}
                 margin="normal"
                 required
               >
-                {jobTypes.map((type) => (
+                {projectTypes.map((type) => (
                   <MenuItem key={type} value={type}>
                     {type}
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField
-                fullWidth
-                label="Location"
-                value={newJob.location}
-                onChange={(e) => setNewJob({ ...newJob, location: e.target.value })}
-                margin="normal"
-                required
-              />
-              <TextField
-                fullWidth
-                label="Preferred Date"
-                type="date"
-                value={newJob.date}
-                onChange={(e) => setNewJob({ ...newJob, date: e.target.value })}
-                margin="normal"
-                InputLabelProps={{ shrink: true }}
-                required
-              />
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    label="ZIP Code"
+                    value={newJob.location.zip}
+                    onChange={(e) => setNewJob({ 
+                      ...newJob, 
+                      location: { ...newJob.location, zip: e.target.value }
+                    })}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    label="City"
+                    value={newJob.location.city}
+                    onChange={(e) => setNewJob({ 
+                      ...newJob, 
+                      location: { ...newJob.location, city: e.target.value }
+                    })}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={4}>
+                  <TextField
+                    fullWidth
+                    label="State"
+                    value={newJob.location.state}
+                    onChange={(e) => setNewJob({ 
+                      ...newJob, 
+                      location: { ...newJob.location, state: e.target.value }
+                    })}
+                    required
+                  />
+                </Grid>
+              </Grid>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Start Date"
+                    type="date"
+                    value={newJob.startDate}
+                    onChange={(e) => setNewJob({ ...newJob, startDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="End Date"
+                    type="date"
+                    value={newJob.endDate}
+                    onChange={(e) => setNewJob({ ...newJob, endDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                    required
+                  />
+                </Grid>
+              </Grid>
               <Button
                 variant="outlined"
                 component="label"
                 fullWidth
                 sx={{ mt: 2 }}
+                startIcon={<AttachFileIcon />}
               >
                 Upload Files
                 <input
                   type="file"
                   hidden
-                  onChange={(e) => setNewJob({ ...newJob, files: e.target.files[0] })}
+                  multiple
+                  onChange={(e) => {
+                    setUploadedFiles(Array.from(e.target.files));
+                  }}
                 />
               </Button>
+              {uploadedFiles.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                  {uploadedFiles.map((file, index) => (
+                    <Chip
+                      key={index}
+                      label={file.name}
+                      onDelete={() => {
+                        setUploadedFiles(files => files.filter((_, i) => i !== index));
+                      }}
+                    />
+                  ))}
+                </Stack>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setOpenJobForm(false)}>Cancel</Button>
