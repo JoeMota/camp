@@ -26,6 +26,7 @@ import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'fire
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import LocationInput from './LocationInput';
 
 const CAMP_LOGO_COLOR = '#2563eb';
 
@@ -56,7 +57,8 @@ export default function CustomerDashboard() {
     location: {
       zip: '',
       city: '',
-      state: ''
+      state: '',
+      coordinates: null
     },
     startDate: '',
     endDate: '',
@@ -126,7 +128,8 @@ export default function CustomerDashboard() {
         location: {
           zip: '',
           city: '',
-          state: ''
+          state: '',
+          coordinates: null
         },
         startDate: '',
         endDate: '',
@@ -256,44 +259,13 @@ export default function CustomerDashboard() {
                   </MenuItem>
                 ))}
               </TextField>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={4}>
-                  <TextField
-                    fullWidth
-                    label="ZIP Code"
-                    value={newJob.location.zip}
-                    onChange={(e) => setNewJob({ 
-                      ...newJob, 
-                      location: { ...newJob.location, zip: e.target.value }
-                    })}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={4}>
-                  <TextField
-                    fullWidth
-                    label="City"
-                    value={newJob.location.city}
-                    onChange={(e) => setNewJob({ 
-                      ...newJob, 
-                      location: { ...newJob.location, city: e.target.value }
-                    })}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={4}>
-                  <TextField
-                    fullWidth
-                    label="State"
-                    value={newJob.location.state}
-                    onChange={(e) => setNewJob({ 
-                      ...newJob, 
-                      location: { ...newJob.location, state: e.target.value }
-                    })}
-                    required
-                  />
-                </Grid>
-              </Grid>
+              
+              <LocationInput
+                value={newJob.location}
+                onChange={(location) => setNewJob({ ...newJob, location })}
+                required
+              />
+
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid item xs={6}>
                   <TextField
