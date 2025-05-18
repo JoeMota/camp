@@ -42,7 +42,7 @@ const LocationInput = ({ onChange, required }) => {
   return (
     <Box>
       <gmp-place-autocomplete
-        placeholder="Search Location"
+        placeholder="Enter your location (e.g., 123 Main St, City, State)"
         required={required}
         ongmp-place-changed={handlePlaceSelect}
         style={{

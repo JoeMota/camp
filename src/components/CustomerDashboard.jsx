@@ -182,7 +182,7 @@ export default function CustomerDashboard() {
 
         <Grid container spacing={3}>
           {jobs.map((job) => (
-            <Grid item xs={12} md={6} key={job.id}>
+            <Grid key={job.id} xs={12} md={6}>
               <Card>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
@@ -267,7 +267,7 @@ export default function CustomerDashboard() {
               />
 
               <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={6}>
+                <Grid xs={6}>
                   <TextField
                     fullWidth
                     label="Start Date"
@@ -278,7 +278,7 @@ export default function CustomerDashboard() {
                     required
                   />
                 </Grid>
-                <Grid item xs={6}>
+                <Grid xs={6}>
                   <TextField
                     fullWidth
                     label="End Date"
